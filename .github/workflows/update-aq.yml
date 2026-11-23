@@ -1,0 +1,59 @@
+name: Update Helena AQ Data
+
+on:
+  schedule:
+# Runs at :25 past every hour (gives DEQ's ~:17 publish time to land)
+    - cron: '25 * * * *'
+  workflow_dispatch:
+
+# Prevent overlapping runs if a manual run coincides with the hourly schedule
+concurrency:
+  group: update-aq-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::arcgislayers
+            any::dplyr
+            any::lubridate
+            any::tibble
+
+      - name: Download existing archive from latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p data
+          gh release download latest --pattern "*.rds" --dir data --clobber \
+            || echo "No existing release assets found; starting fresh bootstrap."
+
+      - name: Run DEQ update script
+        run: Rscript scripts/update_aq_data.R
+
+      - name: Publish updated RDS files to latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest \
+              --title "Latest Air Quality Data" \
+              --notes "Automated hourly PM2.5 datasets for Helena Rossiter Pump House (RP)."
+          fi
+          gh release upload latest data/aq_daily.rds data/aq_hourly.rds --clobber
