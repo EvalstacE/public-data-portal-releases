@@ -1,0 +1,67 @@
+---
+title: "documentation-github-workflows"
+format: html
+---
+
+# Managing GitHub Automated Workflows
+
+## Directory Structure
+
+GitHub enforces is that all workflow .yml files must live in the root .github/workflows/ folder—everything else (scripts, helper functions, docs) can be organized cleanly into topic subfolders.
+
+for example:
+
+public-portal-releases/
+├── .github/
+│   └── workflows/
+│       ├── update-air-quality.yml          
+│       ├── update-communicable-disease.yml 
+│       └── update-behavioral-health.yml    
+├── air-quality/
+│   ├── R/
+│   │   └── get_deq_pm25.R
+│   └── scripts/
+│       └── update_aq_data.R
+├── communicable-disease/
+│   ├── R/
+│   └── scripts/
+│       └── update_cd_data.R
+├── behavioral-health/
+│   ├── R/
+│   └── scripts/
+│       └── update_bh_data.R
+└── shared/
+
+
+give each topic its own rolling release tag—for example:
+
+air-quality-latest
+
+communicable-disease-latest
+
+behavioral-health-latest
+
+If two workflows run at the same time, they upload to separate releases and never overwrite or lock each other out.
+
+
+
+## Referencing Database URLs
+
+Stable URLs for Shiny: Always reference the specific tag name in your Shiny URLs rather than GitHub's /releases/latest/ shortcut (because /releases/latest/ redirects to whichever single release across the whole repo was created most recently)
+
+AQ_DAILY_URL <- "https://github.com/<your-username>/public-portal-releases/releases/download/air-quality-latest/aq_daily.rds"
+CD_DATA_URL  <- "https://github.com/<your-username>/public-portal-releases/releases/download/communicable-disease-latest/cd_summary.rds"
+
+
+## Keeping Each Workflow Isolated in GitHub
+
+
+Each .yml file in .github/workflows/ needs: 
+
+1. Unique `concurrency` group so a weekly disease job never waits on or cancels an hourly air quality job.
+
+2. `working-directory` pointed at that topic's subfolder so your existing source("R/...") and data/ paths keep working unchanged.
+
+3. Topic-specific release tag in the `gh release` commands and only the R packages that specific pipeline needs.
+
+

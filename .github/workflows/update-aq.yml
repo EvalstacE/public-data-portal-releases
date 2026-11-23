@@ -1,22 +1,23 @@
-name: Update Helena AQ Data
+name: Update Air Quality Data
 
 on:
   schedule:
-# Runs at :25 past every hour (gives DEQ's ~:17 publish time to land)
     - cron: '25 * * * *'
   workflow_dispatch:
 
-# Prevent overlapping runs if a manual run coincides with the hourly schedule
 concurrency:
-  group: update-aq-data
+  group: update-air-quality   # Unique per workflow
   cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  update-data:
+  update-aq:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: air-quality   
 
     steps:
       - name: Checkout repository
@@ -36,24 +37,24 @@ jobs:
             any::lubridate
             any::tibble
 
-      - name: Download existing archive from latest release
+      - name: Download existing archive
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p data
-          gh release download latest --pattern "*.rds" --dir data --clobber \
-            || echo "No existing release assets found; starting fresh bootstrap."
+          gh release download air-quality-latest --pattern "*.rds" --dir data --clobber \
+            || echo "No existing air-quality-latest release; starting bootstrap."
 
       - name: Run DEQ update script
         run: Rscript scripts/update_aq_data.R
 
-      - name: Publish updated RDS files to latest release
+      - name: Publish updated RDS files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh release view latest >/dev/null 2>&1; then
-            gh release create latest \
-              --title "Latest Air Quality Data" \
+          if ! gh release view air-quality-latest >/dev/null 2>&1; then
+            gh release create air-quality-latest \
+              --title "Air Quality Data (Latest)" \
               --notes "Automated hourly PM2.5 datasets for Helena Rossiter Pump House (RP)."
           fi
-          gh release upload latest data/aq_daily.rds data/aq_hourly.rds --clobber
+          gh release upload air-quality-latest data/aq_daily.rds data/aq_hourly.rds --clobber
