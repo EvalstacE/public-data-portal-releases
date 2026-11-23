@@ -243,16 +243,16 @@ get_deq_pm25 <- function(
       raw_clean = pmax(rawvalue, 0)
     ) %>%
     summarise(
-      val_reg2 = first_valid(raw_clean[parameter == "PM25_COL" & instrumenttype == "Regulatory_2"]),
-      val_reg1 = first_valid(raw_clean[parameter == "PM25"     & instrumenttype == "Regulatory"]),
+      reg2 = first_valid(raw_clean[parameter == "PM25_COL" & instrumenttype == "Regulatory_2"]),
+      reg1 = first_valid(raw_clean[parameter == "PM25"     & instrumenttype == "Regulatory"]),
       .by = date_mt
     ) %>%
     mutate(
-      raw_clean = coalesce(val_reg2, val_reg1),
-      other_val = if_else(!is.na(val_reg2), val_reg1, val_reg2),
+      raw_clean = coalesce(reg2, reg1),
+      other_val = if_else(!is.na(reg2), reg1, reg2),
       parameter = case_when(
-        !is.na(val_reg2) ~ "PM25_COL",
-        !is.na(val_reg1) ~ "PM25",
+        !is.na(reg2) ~ "PM25_COL",
+        !is.na(reg1) ~ "PM25",
         TRUE             ~ NA_character_
       ),
       pm25 = round(raw_clean)
@@ -277,8 +277,8 @@ get_deq_pm25 <- function(
       hour_mt     = lubridate::hour(date_mt),
       date_end_mt = date_mt + dhours(1),
       date_clean  = as_date(date_end_mt),
-      date_text   = sub(" 0", " ", format(date_clean, "%b %d")),
-      year_text   = format(date_clean, "%Y"),
+      date_txt   = sub(" 0", " ", format(date_clean, "%b %d")),
+      year_txt   = format(date_clean, "%Y"),
       hr_txt      = sub("^0", "", format(date_end_mt, "%I %p")),
       
       prev_val     = lag(raw_clean, 1),
@@ -314,15 +314,15 @@ get_deq_pm25 <- function(
         TRUE                         ~ NA_character_
       ),
       
-      qa_substituted = coalesce(
-        parameter == "PM25_COL" & flag_collocated & flag_spike & !is.na(val_reg1),
+      qa_subbed = coalesce(
+        parameter == "PM25_COL" & flag_collocated & flag_spike & !is.na(reg1),
         FALSE
       )
     ) %>%
     mutate(
-      raw_clean = if_else(qa_substituted, val_reg1, raw_clean),
+      raw_clean = if_else(qa_subbed, reg1, raw_clean),
       pm25      = round(raw_clean),
-      parameter = if_else(qa_substituted, "PM25", parameter)
+      parameter = if_else(qa_subbed, "PM25", parameter)
     ) %>%
     select(-prev_val, -next_val, -neighbor_ref)
   
@@ -375,15 +375,15 @@ get_deq_pm25 <- function(
       max_24hr = if (day_complete && n_valid >= 18L) round(max(raw_clean, na.rm = TRUE), 2)  else NA_real_,
       
       qa_flagged_hrs     = sum(qa_flag, na.rm = TRUE),
-      qa_substituted_hrs = sum(qa_substituted, na.rm = TRUE),
+      qa_subbed_hrs = sum(qa_subbed, na.rm = TRUE),
       qa_details         = if (any(qa_flag, na.rm = TRUE)) {
         idx <- which(qa_flag)
         paste(
           if_else(
-            qa_substituted[idx],
+            qa_subbed[idx],
             sprintf(
               "%s: %.1f -> %.1f (substituted PM25; %s)",
-              hr_txt[idx], val_reg2[idx], raw_clean[idx], qa_reason[idx]
+              hr_txt[idx], reg2[idx], raw_clean[idx], qa_reason[idx]
             ),
             sprintf(
               "%s: %.1f (%s)",
@@ -411,11 +411,11 @@ get_deq_pm25 <- function(
     
     transmute(
       date_clean = day_mt,
-      date_text  = sub(" 0", " ", format(day_mt, "%b %d")),
-      year_text  = format(day_mt, "%Y"),
+      date_txt  = sub(" 0", " ", format(day_mt, "%b %d")),
+      year_txt  = format(day_mt, "%Y"),
       avg_9AM4hr, avg_9AM8hr, avg_4PM4hr, avg_4PM8hr,
       avg_24hr, max_24hr, n_valid,
-      qa_flag, qa_flagged_hrs, qa_substituted_hrs, qa_details,
+      qa_flag, qa_flagged_hrs, qa_subbed_hrs, qa_details,
       completeness_flag, completeness_note,
       instrument_hrs_REG, instrument_hrs_REG2
     ) %>%
