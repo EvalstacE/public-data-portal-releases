@@ -32,10 +32,8 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           packages: |
+            EvalstacE/EpivalE
             any::arcgislayers
-            any::dplyr
-            any::lubridate
-            any::tibble
 
       - name: Download existing archive
         env:
