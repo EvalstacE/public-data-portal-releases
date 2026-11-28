@@ -10,13 +10,9 @@ daily_path  <- "data/aq_daily.rds"
 now_mt   <- with_tz(Sys.time(), "America/Denver")
 today_mt <- as_date(now_mt)
 
-
-#----------------------------------------------------------------------------# 
-#----------------------------------------------------------------------------#  
-#----------------------------------------------------------------------------# 
-#----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Fetch weather data using httr2 -> openmeteo
-#----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 wx_cols <- setdiff(names(wx_empty_daily()), "date_clean")
 
 attach_weather <- function(daily_df, start_d, end_d, old_daily = NULL) {
@@ -40,12 +36,9 @@ has_existing <- file.exists(hourly_path) && file.exists(daily_path)
 
 if (!has_existing) {
   
-#----------------------------------------------------------------------------# 
-#----------------------------------------------------------------------------#  
-#----------------------------------------------------------------------------# 
-#----------------------------------------------------------------------------#
-# First-run bootstrap: pull rolling 12-month window
-#----------------------------------------------------------------------------#
+  #----------------------------------------------------------------------------#
+  # First-run bootstrap: pull rolling 12-month window
+  #----------------------------------------------------------------------------#
   message("No existing archive found. Running initial 12-month backfill...")
   
   backfill_start <- today_mt - months(12)
@@ -69,13 +62,10 @@ if (!has_existing) {
   
 } else {
   
-#----------------------------------------------------------------------------# 
-#----------------------------------------------------------------------------#  
-#----------------------------------------------------------------------------#  
-#----------------------------------------------------------------------------#
-# Routine run: recompute & overwrite the last 7 calendar days
-# (fetches 8 days so lag() has a valid neighbor on day 1 of the 7-day slice)
-#----------------------------------------------------------------------------#
+  #----------------------------------------------------------------------------#
+  # Routine run: recompute & overwrite the last 7 calendar days
+  # (fetches 8 days so lag() has a valid neighbor on day 1 of the 7-day slice)
+  #----------------------------------------------------------------------------#
   overwrite_from <- today_mt - days(6)
   fetch_start    <- today_mt - days(7)
   
@@ -97,7 +87,12 @@ if (!has_existing) {
   old_hourly <- readRDS(hourly_path)
   old_daily  <- readRDS(daily_path)
   
-  new_hourly <- fresh$hourly %>% filter(day_mt >= overwrite_from)
+  # One-time migration shim if the saved archive still uses `day_mt`
+  if ("day_mt" %in% names(old_hourly) && !"date_clean" %in% names(old_hourly)) {
+    old_hourly <- old_hourly %>% rename(date_clean = day_mt)
+  }
+  
+  new_hourly <- fresh$hourly %>% filter(date_clean >= overwrite_from)
   new_daily  <- fresh$daily %>%
     filter(date_clean >= overwrite_from) %>%
     attach_weather(overwrite_from, today_mt, old_daily = old_daily)
@@ -107,7 +102,7 @@ if (!has_existing) {
   assert_same_schema(old_daily,  new_daily,  "aq_daily")
   
   aq_hourly_final <- old_hourly %>%
-    filter(day_mt < overwrite_from) %>%
+    filter(date_clean < overwrite_from) %>%
     bind_rows(new_hourly) %>%
     arrange(date_mt)
   
@@ -128,7 +123,7 @@ saveRDS(aq_daily_final,  daily_path)
 message(sprintf(
   "Saved %d hourly rows (%s to %s) and %d daily rows.",
   nrow(aq_hourly_final),
-  min(aq_hourly_final$day_mt, na.rm = TRUE),
-  max(aq_hourly_final$day_mt, na.rm = TRUE),
+  min(aq_hourly_final$date_clean, na.rm = TRUE),
+  max(aq_hourly_final$date_clean, na.rm = TRUE),
   nrow(aq_daily_final)
 ))
