@@ -87,11 +87,6 @@ if (!has_existing) {
   old_hourly <- readRDS(hourly_path)
   old_daily  <- readRDS(daily_path)
   
-  # One-time migration shim if the saved archive still uses `day_mt`
-  if ("day_mt" %in% names(old_hourly) && !"date_clean" %in% names(old_hourly)) {
-    old_hourly <- old_hourly %>% rename(date_clean = day_mt)
-  }
-  
   new_hourly <- fresh$hourly %>% filter(date_clean >= overwrite_from)
   new_daily  <- fresh$daily %>%
     filter(date_clean >= overwrite_from) %>%
